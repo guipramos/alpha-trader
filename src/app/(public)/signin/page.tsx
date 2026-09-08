@@ -13,9 +13,13 @@ import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { Checkbox } from "../../components/ui/Checkbox";
 import { Input } from "../../components/ui/Input";
+import { login } from "../../lib/actions";
 import { LoginInput, loginSchema } from "../../schemas/login-schema";
+import { useState } from "react";
 
 export default function Signin() {
+  const [error, setError] = useState("");
+
   const {
     register,
     handleSubmit,
@@ -25,7 +29,14 @@ export default function Signin() {
     defaultValues: { rememberMe: false },
   });
 
-  const onSubmit = (_data: LoginInput) => {};
+  const onSubmit = async (data: LoginInput) => {
+    setError("");
+    const result = await login(data);
+
+    if (result?.error) {
+      setError(result.error);
+    }
+  };
 
   return (
     <div className="flex h-screen w-full items-center justify-center">
@@ -85,6 +96,10 @@ export default function Signin() {
             Login
           </Button>
         </form>
+
+        {error ? (
+          <p className="mt-3 text-[12px] text-tertiary">{error}</p>
+        ) : null}
 
         <div className="mt-6 flex flex-col items-center gap-4">
           <hr className="w-full border-elevated" />

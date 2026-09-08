@@ -1,4 +1,5 @@
 import { MiddlewareConfig, NextRequest, NextResponse } from "next/server";
+import { AUTH_TOKEN_VALUE } from "./app/lib/auth";
 
 const publicRoutes = [
   { path: "/signin", whenAuthenticated: "redirect" },
@@ -6,39 +7,43 @@ const publicRoutes = [
 
 const REDIRECT_WHEN_NOT_AUTHENTICATED_ROUTE = "/signin";
 
+function isAuthenticated(request: NextRequest) {
+  return request.cookies.get("token")?.value === AUTH_TOKEN_VALUE;
+}
+
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
   const publicRoute = publicRoutes.find((route) => route.path === path);
-  const authToken = request.cookies.get("token");
+  const authenticated = isAuthenticated(request);
 
-  if (!authToken && publicRoute) {
+  if (path.startsWith("/api/")) {
+    if (!authenticated) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     return NextResponse.next();
   }
 
-  if (!authToken && !publicRoute) {
+  if (path === "/") {
     const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = authenticated ? "/dashboard" : "/signin";
+    return NextResponse.redirect(redirectUrl);
+  }
 
+  if (!authenticated && publicRoute) {
+    return NextResponse.next();
+  }
+
+  if (!authenticated && !publicRoute) {
+    const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = REDIRECT_WHEN_NOT_AUTHENTICATED_ROUTE;
-
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (
-    authToken &&
-    publicRoute &&
-    publicRoute.whenAuthenticated === "redirect"
-  ) {
+  if (authenticated && publicRoute?.whenAuthenticated === "redirect") {
     const redirectUrl = request.nextUrl.clone();
-
-    redirectUrl.pathname = "/";
-
+    redirectUrl.pathname = "/dashboard";
     return NextResponse.redirect(redirectUrl);
-  }
-
-  if (authToken && !publicRoute) {
-    // Checar se o JWT está expirado
-    // Se sim, remover o cookie e redirecionar o usuario para login
-    return NextResponse.next();
   }
 
   return NextResponse.next();
@@ -46,13 +51,6 @@ export function middleware(request: NextRequest) {
 
 export const config: MiddlewareConfig = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };
